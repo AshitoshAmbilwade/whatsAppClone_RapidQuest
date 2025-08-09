@@ -1,17 +1,16 @@
-// src/services/messageService.js
-import Message from '../models/Message.js';
+import ProcessedMessage from '../models/Message.js';
 
+// Get conversations grouped by wa_id
 export const getConversationsService = async ({ limit = 20, skip = 0, search = '' }) => {
   const matchStage = {};
-
-  if (search && search.trim() !== '') {
+  if (search.trim()) {
     matchStage.$or = [
       { name: { $regex: search, $options: 'i' } },
       { wa_id: { $regex: search, $options: 'i' } }
     ];
   }
 
-  const conversations = await Message.aggregate([
+  return await ProcessedMessage.aggregate([
     { $match: matchStage },
     { $sort: { timestamp: -1 } },
     {
@@ -38,59 +37,37 @@ export const getConversationsService = async ({ limit = 20, skip = 0, search = '
       }
     },
     { $sort: { last_timestamp: -1 } },
-    { $skip: Number(skip) },
-    { $limit: Math.min(Number(limit), 100) } // Cap limit for performance
+    { $skip: skip },
+    { $limit: Math.min(limit, 100) }
   ]);
-
-  return conversations;
 };
 
+// Get messages for a conversation
 export const getMessagesByWaId = async (wa_id) => {
-  return await Message.find({ wa_id: wa_id }).sort({ timestamp: -1 });
+  return await ProcessedMessage.find({ wa_id }).sort({ timestamp: 1 });
 };
 
-/**
- * Search messages by text, name, or wa_id
- * @param {string} query - Search term
- * @param {number} limit - Max results
- * @param {number} skip - Offset
- * @returns {Array} Matching messages
- */
+// Search messages globally
 export const searchMessagesService = async ({ query, limit = 20, skip = 0 }) => {
-  if (!query || query.trim() === '') {
-    return [];
-  }
-
-  const searchRegex = new RegExp(query, 'i');
-
-  const messages = await Message.find({
-    $or: [
-      { text: searchRegex },
-      { name: searchRegex },
-      { wa_id: searchRegex }
-    ]
+  if (!query.trim()) return [];
+  const regex = new RegExp(query, 'i');
+  return await ProcessedMessage.find({
+    $or: [{ text: regex }, { name: regex }, { wa_id: regex }]
   })
     .sort({ timestamp: -1 })
-    .skip(Number(skip))
-    .limit(Number(limit));
-
-  return messages;
+    .skip(skip)
+    .limit(limit);
 };
 
-// Mark all incoming messages for a contact as read
-
+// Mark messages as read
 export const markMessagesAsReadService = async (wa_id) => {
-  const result = await Message.updateMany(
-    {
-      wa_id,
-      direction: 'incoming',
-      status: { $in: ['sent', 'delivered'] }
-    },
+  return await ProcessedMessage.updateMany(
+    { wa_id, direction: 'incoming', status: { $in: ['sent', 'delivered'] } },
     { $set: { status: 'read' } }
   );
-  return result;
 };
 
+// Get messages with filters
 export const getMessagesByWaIdWithFilters = async ({
   wa_id,
   status,
@@ -102,27 +79,34 @@ export const getMessagesByWaIdWithFilters = async ({
 }) => {
   const query = { wa_id };
 
-  // Filter by status
-  if (status) {
-    query.status = { $in: status.split(',') }; // support multiple statuses
-  }
-
-  // Filter by type
-  if (type) {
-    query.type = { $in: type.split(',') }; // support multiple types
-  }
-
-  // Date range filter
+  if (status) query.status = { $in: status.split(',') };
+  if (type) query.type = { $in: type.split(',') };
   if (from || to) {
     query.timestamp = {};
     if (from) query.timestamp.$gte = new Date(from);
     if (to) query.timestamp.$lte = new Date(to);
   }
 
-  const messages = await Message.find(query)
-    .sort({ timestamp: -1 })
-    .skip(Number(skip))
-    .limit(Number(limit));
+  return await ProcessedMessage.find(query)
+    .sort({ timestamp: 1 })
+    .skip(skip)
+    .limit(limit);
+};
 
-  return messages;
+// Create new message manually (Send Message demo)
+export const createMessageService = async (payload) => {
+  const { wa_id, name, text, type, direction } = payload;
+  const newMsg = new ProcessedMessage({
+    wa_id,
+    name: name || 'Unknown',
+    message_id: payload.message_id || `local-${Date.now()}`,
+    direction: direction || 'outgoing',
+    type: type || 'text',
+    text,
+    status: 'sent',
+    timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+    raw_payload: payload,
+    source: payload.source || 'manual'
+  });
+  return await newMsg.save();
 };

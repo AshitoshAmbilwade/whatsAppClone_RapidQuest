@@ -3,12 +3,12 @@ import mongoose from 'mongoose';
 
 const MessageSchema = new mongoose.Schema(
   {
-    wa_id: { type: String, required: true }, // Contact phone number
-    name: { type: String, default: 'Unknown' }, // Contact name
-    message_id: { type: String, required: true, unique: true }, // WhatsApp message ID
+    wa_id: { type: String, required: true },
+    name: { type: String, default: 'Unknown' },
+    message_id: { type: String, required: true, unique: true },
     direction: { type: String, enum: ['incoming', 'outgoing'], default: 'incoming' },
-    type: { type: String, default: 'text' }, // text, image, etc.
-    text: { type: String }, // Text content
+    type: { type: String, default: 'text' },
+    text: { type: String },
     media: {
       url: String,
       mimeType: String,
@@ -22,14 +22,16 @@ const MessageSchema = new mongoose.Schema(
     phone_number_id: String,
     display_phone_number: String,
     timestamp: { type: Date, required: true },
-    raw_payload: { type: Object }, // Store entire payload for debugging
-    source: { type: String, default: 'webhook' }, // webhook, file-import, etc.
+    raw_payload: { type: Object },
+    source: { type: String, default: 'webhook' },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    collection: 'processed_messages' // ✅ Force this exact collection name
+  }
 );
 
-// Indexes for query performance
 MessageSchema.index({ wa_id: 1, timestamp: -1 });
 
-const Message = mongoose.model('Message', MessageSchema);
-export default Message;
+const ProcessedMessage = mongoose.model('ProcessedMessage', MessageSchema);
+export default ProcessedMessage;
