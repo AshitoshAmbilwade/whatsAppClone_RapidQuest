@@ -1,18 +1,37 @@
 import React from "react";
 import ConversationItem from "./ConversationItem";
 
-export default function ConversationList() {
-  // For now, mock data
-  const conversations = [
-    { id: 1, name: "John Doe", lastMessage: "Hello!", time: "12:30 PM" },
-    { id: 2, name: "Jane Smith", lastMessage: "How are you?", time: "11:15 AM" },
-  ];
+/**
+ * Props:
+ *  - conversations: Array of conversation objects (from API)
+ *  - selectedWaId: currently active wa_id (string)
+ *  - onSelectConversation: function(wa_id) => void
+ */
+export default function ConversationList({
+  conversations = [],
+  selectedWaId = null,
+  onSelectConversation = () => {},
+}) {
+  // Ensure conversations is an array
+  const safeConversations = Array.isArray(conversations) ? conversations : [];
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      {conversations.map((conv) => (
-        <ConversationItem key={conv.id} {...conv} />
-      ))}
+    <div className="h-full overflow-y-auto">
+      {safeConversations.length === 0 ? (
+        <div className="p-4 text-center text-gray-500">No conversations</div>
+      ) : (
+        safeConversations.map((conv) => {
+          const key = conv._id || conv.wa_id || `${conv.name}-${Math.random()}`;
+          return (
+            <ConversationItem
+              key={key}
+              conversation={conv}
+              active={(conv._id || conv.wa_id) === selectedWaId}
+              onSelect={() => onSelectConversation(conv._id || conv.wa_id)}
+            />
+          );
+        })
+      )}
     </div>
   );
 }

@@ -1,33 +1,31 @@
+// src/components/ChatWindow/MessageInput.jsx
 import React, { useState } from "react";
 
-export default function MessageInput() {
-  const [message, setMessage] = useState("");
+export default function MessageInput({ onSend }) {
+  const [text, setText] = useState("");
 
-  const sendMessage = (e) => {
-    e.preventDefault();
-    if (!message.trim()) return;
-    console.log("Send:", message);
-    setMessage("");
+  const handleSend = () => {
+    if (!text.trim()) return;
+    onSend(text);
+    setText("");
   };
 
   return (
-    <form
-      onSubmit={sendMessage}
-      className="p-3 flex items-center gap-2 border-t bg-gray-100"
-    >
+    <div className="p-3 border-t flex items-center gap-2 bg-white">
       <input
         type="text"
+        className="flex-1 border rounded-full px-4 py-2 focus:outline-none"
         placeholder="Type a message"
-        className="flex-1 p-2 rounded-full border border-gray-300 focus:outline-none"
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && handleSend()}
       />
       <button
-        type="submit"
-        className="bg-green-500 text-white p-2 rounded-full hover:bg-green-600"
+        className="bg-green-500 text-white px-4 py-2 rounded-full"
+        onClick={handleSend}
       >
-        ➤
+        Send
       </button>
-    </form>
+    </div>
   );
 }

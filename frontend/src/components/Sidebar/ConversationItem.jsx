@@ -1,20 +1,43 @@
+// src/components/Sidebar/ConversationItem.jsx
 import React from "react";
 
-export default function ConversationItem({ name, lastMessage, time }) {
+export default function ConversationItem({ conversation, active, onSelect }) {
+  const { _id: wa_id, name, last_message, last_timestamp, unread_count } = conversation;
+
+  const handleClick = () => {
+    if (typeof onSelect === "function") {
+      onSelect(wa_id);
+    }
+  };
+
   return (
-    <div className="flex items-center justify-between p-3 hover:bg-gray-100 cursor-pointer border-b">
-      <div className="flex items-center gap-3">
-        <img
-          src="https://imgs.search.brave.com/O9pF85gxQOywJcgAaeO23ZZ9rurhMIBJnRcGl4Ke_AI/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly90aHVt/YnMuZHJlYW1zdGlt/ZS5jb20vYi9wb3J0/cmFpdC15b3VuZy1o/YW5kc29tZS1tYW4t/d2hpdGUtc2hpcnQt/b3V0ZG9vci1uaWNl/LWFwcGVhcmFuY2Ut/c3R5bGlzaC1oYWly/LWJlYXJkLWxlYW5p/bmctc2lkZS13YWxs/LTEzMTkyODgwMy5q/cGc"
-          alt={name}
-          className="w-10 h-10 rounded-full"
-        />
-        <div>
-          <p className="font-semibold">{name}</p>
-          <p className="text-sm text-gray-500 truncate">{lastMessage}</p>
+    <div
+      onClick={handleClick}
+      className={`flex items-center p-3 gap-3 cursor-pointer hover:bg-gray-100 ${
+        active ? "bg-gray-200" : ""
+      }`}
+    >
+      <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center">
+        <span className="font-semibold text-sm">
+          {(name || wa_id || "").slice(0, 1).toUpperCase()}
+        </span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-center">
+          <div className="truncate font-medium">{name || wa_id}</div>
+          <div className="text-xs text-gray-500">
+            {last_timestamp ? new Date(last_timestamp).toLocaleString() : ""}
+          </div>
+        </div>
+        <div className="flex justify-between items-center mt-1">
+          <div className="truncate text-sm text-gray-600">{last_message || ""}</div>
+          {unread_count > 0 && (
+            <div className="ml-2 bg-green-500 text-white rounded-full px-2 py-0.5 text-xs">
+              {unread_count}
+            </div>
+          )}
         </div>
       </div>
-      <p className="text-xs text-gray-400">{time}</p>
     </div>
   );
 }
