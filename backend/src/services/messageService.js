@@ -13,7 +13,7 @@ export const getConversationsService = async ({ limit = 20, skip = 0, search = '
 
   const conversations = await Message.aggregate([
     { $match: matchStage },
-    { $sort: { timestamp: -1 } },
+    { $sort: { timestamp: -1 } }, // sort so $first gets latest
     {
       $group: {
         _id: '$wa_id',
@@ -24,10 +24,12 @@ export const getConversationsService = async ({ limit = 20, skip = 0, search = '
         unread_count: {
           $sum: {
             $cond: [
-              { $and: [
-                { $in: ['$status', ['sent', 'delivered']] },
-                { $eq: ['$direction', 'incoming'] }
-              ] },
+              {
+                $and: [
+                  { $in: ['$status', ['sent', 'delivered']] },
+                  { $eq: ['$direction', 'incoming'] }
+                ]
+              },
               1,
               0
             ]
