@@ -47,3 +47,32 @@ export const getConversationsService = async ({ limit = 20, skip = 0, search = '
 export const getMessagesByWaId = async (wa_id) => {
   return await Message.find({ wa_id: wa_id }).sort({ timestamp: -1 });
 };
+
+/**
+ * Search messages by text, name, or wa_id
+ * @param {string} query - Search term
+ * @param {number} limit - Max results
+ * @param {number} skip - Offset
+ * @returns {Array} Matching messages
+ */
+export const searchMessagesService = async ({ query, limit = 20, skip = 0 }) => {
+  if (!query || query.trim() === '') {
+    return [];
+  }
+
+  const searchRegex = new RegExp(query, 'i');
+
+  const messages = await Message.find({
+    $or: [
+      { text: searchRegex },
+      { name: searchRegex },
+      { wa_id: searchRegex }
+    ]
+  })
+    .sort({ timestamp: -1 })
+    .skip(Number(skip))
+    .limit(Number(limit));
+
+  return messages;
+};
+
