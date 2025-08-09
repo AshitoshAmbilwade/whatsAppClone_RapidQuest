@@ -1,6 +1,6 @@
 // src/routes/messageRoutes.js
 import express from 'express';
-import { listConversations, listMessages, searchMessages,markMessagesAsRead } from '../controllers/messageController.js';
+import { listConversations, listMessages, searchMessages,markMessagesAsRead,listMessagesWithFilters } from '../controllers/messageController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { markReadValidation } from '../validations/messageValidation.js';
@@ -18,5 +18,7 @@ router.get('/search', protect, searchMessages);
 
 // Mark messages as read
 router.patch('/:wa_id/read', protect, validateRequest(markReadValidation, 'params'), markMessagesAsRead);
+
+router.get('/:wa_id/filter', protect, listMessagesWithFilters);
 
 export default router;

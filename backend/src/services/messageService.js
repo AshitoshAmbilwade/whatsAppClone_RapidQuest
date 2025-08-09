@@ -90,3 +90,39 @@ export const markMessagesAsReadService = async (wa_id) => {
   );
   return result;
 };
+
+export const getMessagesByWaIdWithFilters = async ({
+  wa_id,
+  status,
+  type,
+  from,
+  to,
+  limit = 20,
+  skip = 0
+}) => {
+  const query = { wa_id };
+
+  // Filter by status
+  if (status) {
+    query.status = { $in: status.split(',') }; // support multiple statuses
+  }
+
+  // Filter by type
+  if (type) {
+    query.type = { $in: type.split(',') }; // support multiple types
+  }
+
+  // Date range filter
+  if (from || to) {
+    query.timestamp = {};
+    if (from) query.timestamp.$gte = new Date(from);
+    if (to) query.timestamp.$lte = new Date(to);
+  }
+
+  const messages = await Message.find(query)
+    .sort({ timestamp: -1 })
+    .skip(Number(skip))
+    .limit(Number(limit));
+
+  return messages;
+};

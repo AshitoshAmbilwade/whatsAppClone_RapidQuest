@@ -1,4 +1,4 @@
-import { getConversationsService, getMessagesByWaId,searchMessagesService,markMessagesAsReadService } from '../services/messageService.js';
+import { getConversationsService, getMessagesByWaId,searchMessagesService,markMessagesAsReadService, getMessagesByWaIdWithFilters } from '../services/messageService.js';
 import { searchValidation } from '../validations/messageValidation.js';
 
 export const listConversations = async (req, res, next) => {
@@ -69,6 +69,32 @@ export const markMessagesAsRead = async (req, res, next) => {
     res.status(200).json({
       success: true,
       updatedCount: result.modifiedCount
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export const listMessagesWithFilters = async (req, res, next) => {
+  try {
+    const { status, type, from, to, limit, skip } = req.query;
+    const { wa_id } = req.params;
+
+    const messages = await getMessagesByWaIdWithFilters({
+      wa_id,
+      status,
+      type,
+      from,
+      to,
+      limit: Number(limit) || 20,
+      skip: Number(skip) || 0
+    });
+
+    res.status(200).json({
+      success: true,
+      count: messages.length,
+      messages
     });
   } catch (error) {
     next(error);
