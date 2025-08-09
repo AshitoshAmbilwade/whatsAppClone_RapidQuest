@@ -2,15 +2,16 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Home from "../pages/Home";
 import Login from "../pages/Auth/Login";
 import Register from "../pages/Auth/Register";
-import PrivateRoute from "./PrivateRoute";
+import ProtectedRoute from "./ProtectedRoute";
 import PublicRoute from "./PublicRoute";
+import Dashboard from "../pages/Dashboard";
 
 
 export default function AppRoutes() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
+        
         <Route
           path="/login"
           element={
@@ -27,6 +28,16 @@ export default function AppRoutes() {
             </PublicRoute>
           }
         />
+
+        {/* Protected Dashboard */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
          </Routes>
     </Router>
   );
