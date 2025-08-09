@@ -10,3 +10,9 @@ export const searchValidation = Joi.object({
   limit: Joi.number().min(1).max(100).optional(),
   skip: Joi.number().min(0).optional()
 });
+
+export const markReadValidation = Joi.object({
+  wa_id: Joi.string().required().messages({
+    'string.empty': 'wa_id is required'
+  })
+});

@@ -1,93 +1,129 @@
+// src/services/payloadProcessor.js
 import Message from '../models/Message.js';
 import PayloadLog from '../models/PayloadLog.js';
+import { updateMessageStatus } from './statusService.js'; // make sure path is correct
 
 /**
- * Process a WhatsApp webhook payload (message or status)
- * and emit real-time events if Socket.IO is available.
- * 
- * @param {Object} payload - The raw payload from file or webhook
- * @param {String} source - Source of payload ('webhook' or 'file-import')
- * @param {Object} io - Optional Socket.IO instance for real-time updates
+ * Process a WhatsApp webhook or manual payload and emit real-time events.
+ * @param {Object} payload - raw JSON payload
+ * @param {String} source - 'webhook' | 'file-import'
+ * @param {Object} io - optional Socket.IO instance (req.app.get('io'))
  */
 export const processPayload = async (payload, source = 'webhook', io = null) => {
   try {
-    // Save raw payload to logs
-    await PayloadLog.create({
-      payload_type: payload.payload_type || 'unknown',
+    // 1) Save raw payload for auditing
+    const log = await PayloadLog.create({
+      payload_type: payload.payload_type || payload.type || 'whatsapp_webhook',
       raw_payload: payload,
       processed: false,
-      source,
+      source
     });
 
-    // Extract relevant data
-    const entry = payload?.metaData?.entry?.[0];
-    const change = entry?.changes?.[0];
-    const value = change?.value;
+    // 2) Normalize to entries/changes/value (support several payload shapes)
+    const entries = payload?.metaData?.entry
+      || payload?.entry
+      || payload?.entries
+      || (payload?.object ? payload.metaData?.entry : undefined)
+      || [];
 
-    if (!value) {
-      throw new Error('Invalid payload: missing value object');
-    }
+    // counters for response
+    let insertedCount = 0;
+    let statusUpdatedCount = 0;
 
-    const contact = value.contacts?.[0];
-    const messageData = value.messages?.[0];
-    const statusData = value.statuses?.[0];
+    // helper to safely extract nested arrays
+    const safeArray = (x) => (Array.isArray(x) ? x : []);
 
-    let savedMessage = null;
+    for (const entry of safeArray(entries)) {
+      const changes = safeArray(entry.changes || entry.change || entry.changes || []);
 
-    if (messageData) {
-      // MESSAGE PAYLOAD
-      const newMessage = {
-        wa_id: contact?.wa_id,
-        name: contact?.profile?.name || 'Unknown',
-        message_id: messageData.id,
-        direction:
-          messageData.from === contact?.wa_id ? 'incoming' : 'outgoing',
-        type: messageData.type || 'text',
-        text: messageData.text?.body || '',
-        media: {},
-        status: 'sent',
-        phone_number_id: value.metadata?.phone_number_id,
-        display_phone_number: value.metadata?.display_phone_number,
-        timestamp: new Date(Number(messageData.timestamp) * 1000),
-        raw_payload: payload,
-        source,
-      };
+      for (const change of changes) {
+        // value sometimes sits directly on change.value
+        const value = change.value || change || entry.value || entry;
 
-      savedMessage = await Message.create(newMessage);
+        // -------------- messages --------------
+        const messages = safeArray(value.messages || []);
+        for (const msg of messages) {
+          // build message doc
+          const msgId = msg.id || msg.message_id || msg.mid;
+          if (!msgId) continue;
 
-      // Emit real-time event for new message
-      if (io) {
-        io.emit('new_message', savedMessage);
-      }
+          const contact = (value.contacts && value.contacts[0]) || (msg.contacts && msg.contacts[0]) || {};
+          const metadata = value.metadata || value.meta || value.messaging_product || {};
 
-    } else if (statusData) {
-      // STATUS PAYLOAD
-      await Message.updateOne(
-        { message_id: statusData.id },
-        { $set: { status: statusData.status } }
-      );
+          const direction = msg.from === contact?.wa_id ? 'incoming' : 'outgoing';
+          const timestampSecs = Number(msg.timestamp || msg.time || msg.ts) || null;
+          const timestamp = timestampSecs ? new Date(Number(timestampSecs) * 1000) : new Date();
 
-      // Emit real-time status update
-      if (io) {
-        io.emit('message_status_update', {
-          message_id: statusData.id,
-          status: statusData.status
-        });
-      }
+          const newDoc = {
+            wa_id: contact?.wa_id || msg.from || '',
+            name: contact?.profile?.name || contact?.name || msg.profile?.name || 'Unknown',
+            message_id: msgId,
+            direction,
+            type: msg.type || (msg.text ? 'text' : 'unknown'),
+            text: msg.text?.body || (msg.text && msg.text.body) || '',
+            media: msg.media || {},
+            status: 'sent',
+            phone_number_id: metadata?.phone_number_id || metadata?.phone_number_id || '',
+            display_phone_number: metadata?.display_phone_number || '',
+            timestamp,
+            raw_payload: payload,
+            source
+          };
 
-    } else {
-      throw new Error('Unknown payload type: no messages or statuses found');
-    }
+          // Upsert: insert only if not exists
+          const updateRes = await Message.updateOne(
+            { message_id: msgId },
+            { $setOnInsert: newDoc },
+            { upsert: true }
+          );
 
-    // Mark payload as processed in logs
+          // Mongo response: check upsertedCount (native driver prop)
+          // Mongoose's updateOne returns an object with `upsertedCount` in newer versions or `upsertedId`.
+          // We'll check both to be safe.
+          const upserted = updateRes.upsertedCount > 0 || (updateRes.upsertedId && Object.keys(updateRes.upsertedId).length > 0);
+
+          if (upserted) {
+            insertedCount += 1;
+            // fetch saved document to emit full doc
+            const saved = await Message.findOne({ message_id: msgId });
+            if (io) io.emit('new_message', saved);
+          }
+        } // end messages loop
+
+        // -------------- statuses --------------
+        const statuses = safeArray(value.statuses || value.status || []);
+        for (const st of statuses) {
+          // status payloads often have `id` matching message_id, but some providers use meta_msg_id
+          const statusId = st.id || st.message_id || st.meta_msg_id || st.meta_msg_id || null;
+          const newStatus = st.status || st.state || null;
+          if (!statusId || !newStatus) continue;
+
+          // Use the shared status service to avoid downgrades
+          await updateMessageStatus(statusId, newStatus);
+
+          // Optionally update updatedAt in DB and count
+          const updated = await Message.updateOne(
+            { message_id: statusId },
+            { $set: { updatedAt: new Date() } }
+          );
+
+          if (updated.modifiedCount > 0 || updated.matchedCount > 0) {
+            statusUpdatedCount += 1;
+            if (io) io.emit('message_status_update', { message_id: statusId, status: newStatus });
+          }
+        } // end statuses loop
+      } // end changes loop
+    } // end entries loop
+
+    // 3) mark payload log processed
     await PayloadLog.updateOne(
-      { raw_payload: payload },
+      { _id: log._id },
       { $set: { processed: true } }
     );
 
-    return { success: true, data: savedMessage };
+    return { success: true, insertedCount, statusUpdatedCount };
   } catch (error) {
-    console.error('Error processing payload:', error.message);
-    return { success: false, error: error.message };
+    console.error('Error processing payload:', error);
+    return { success: false, error: error.message || String(error) };
   }
 };

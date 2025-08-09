@@ -4,7 +4,7 @@ import Message from '../models/Message.js';
 export const getConversationsService = async ({ limit = 20, skip = 0, search = '' }) => {
   const matchStage = {};
 
-  if (search) {
+  if (search && search.trim() !== '') {
     matchStage.$or = [
       { name: { $regex: search, $options: 'i' } },
       { wa_id: { $regex: search, $options: 'i' } }
@@ -13,7 +13,7 @@ export const getConversationsService = async ({ limit = 20, skip = 0, search = '
 
   const conversations = await Message.aggregate([
     { $match: matchStage },
-    { $sort: { timestamp: -1 } }, // sort so $first gets latest
+    { $sort: { timestamp: -1 } },
     {
       $group: {
         _id: '$wa_id',
@@ -39,11 +39,12 @@ export const getConversationsService = async ({ limit = 20, skip = 0, search = '
     },
     { $sort: { last_timestamp: -1 } },
     { $skip: Number(skip) },
-    { $limit: Number(limit) }
+    { $limit: Math.min(Number(limit), 100) } // Cap limit for performance
   ]);
 
   return conversations;
 };
+
 export const getMessagesByWaId = async (wa_id) => {
   return await Message.find({ wa_id: wa_id }).sort({ timestamp: -1 });
 };
@@ -76,3 +77,16 @@ export const searchMessagesService = async ({ query, limit = 20, skip = 0 }) => 
   return messages;
 };
 
+// Mark all incoming messages for a contact as read
+
+export const markMessagesAsReadService = async (wa_id) => {
+  const result = await Message.updateMany(
+    {
+      wa_id,
+      direction: 'incoming',
+      status: { $in: ['sent', 'delivered'] }
+    },
+    { $set: { status: 'read' } }
+  );
+  return result;
+};
