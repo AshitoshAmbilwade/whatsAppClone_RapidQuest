@@ -2,6 +2,7 @@ import { processPayload } from '../services/payloadProcessor.js';
 
 export const webhookVerify = (req, res) => {
   const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+  console.log('Token from env:', VERIFY_TOKEN);
 
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
