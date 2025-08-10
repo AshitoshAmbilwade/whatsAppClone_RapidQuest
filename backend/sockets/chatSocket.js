@@ -1,30 +1,30 @@
-// backend/sockets/chatSocket.js
-
 export default function chatSocket(io, socket) {
-    console.log(`✅ Chat socket initialized for ${socket.id}`);
+  // User joins their personal room
+  socket.on('join', (wa_id) => {
+    socket.join(wa_id);
+    console.log(`📌 ${wa_id} joined their personal room`);
+  });
 
-    // Listen for when a user joins with their wa_id (simulated login)
-    socket.on('join', (wa_id) => {
-        socket.join(wa_id); // Join a room named after wa_id
-        console.log(`📌 User with wa_id ${wa_id} joined room`);
-    });
+  // User joins a specific conversation room
+  socket.on('join_conversation', ({ userWaId, contactWaId }) => {
+    const roomId = [userWaId, contactWaId].sort().join('-'); // unique conversation id
+    socket.join(roomId);
+    console.log(`📌 ${userWaId} joined conversation room ${roomId}`);
+  });
 
-    // Listen for sending message from client
-    socket.on('send_message', (messageData) => {
-        console.log(`💬 New message from ${messageData.sender_wa_id} to ${messageData.receiver_wa_id}`);
+  // Send message
+  socket.on('send_message', (msg) => {
+    if (!msg.sender_wa_id || !msg.receiver_wa_id) return;
 
-        // Emit to receiver's room
-        io.to(messageData.receiver_wa_id).emit('new_message', messageData);
+    const roomId = [msg.sender_wa_id, msg.receiver_wa_id].sort().join('-');
 
-        // Emit back to sender's room to confirm
-        io.to(messageData.sender_wa_id).emit('message_sent', messageData);
-    });
+    // Emit to conversation room (both sides)
+    io.to(roomId).emit('new_message', msg);
+  });
 
-    // Listen for status updates (e.g., read receipts)
-    socket.on('update_status', (statusData) => {
-        console.log(`📨 Status update: ${statusData.message_id} → ${statusData.status}`);
-
-        // Notify the sender about the status update
-        io.to(statusData.sender_wa_id).emit('status_updated', statusData);
-    });
+  // Status updates
+  socket.on('update_status', (statusData) => {
+    const roomId = [statusData.sender_wa_id, statusData.receiver_wa_id].sort().join('-');
+    io.to(roomId).emit('status_updated', statusData);
+  });
 }

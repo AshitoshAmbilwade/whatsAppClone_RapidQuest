@@ -2,21 +2,25 @@
 import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema(
-    {
-        wa_id: { type: String, required: true },       // Contact's WhatsApp ID
-        name: { type: String, required: false },       // Contact's name if available
-        message_id: { type: String, required: true },  // WhatsApp message ID
-        meta_msg_id: { type: String },                 // Optional link for status updates
-        type: { type: String, required: true },        // Message type (text, image, etc.)
-        text: { type: String },                        // Message text
-        timestamp: { type: Date, required: true },     // Message timestamp
-        status: { type: String, default: 'sent' },     // sent, delivered, read
-        direction: { type: String, enum: ['incoming', 'outgoing'], required: true },
-    },
-    {
-        timestamps: true, // createdAt, updatedAt
-        collection: 'processed_messages' // Explicit collection name
-    }
+  {
+    wa_id: { type: String },                // legacy / contact id (kept for compatibility)
+    name: { type: String },
+    message_id: { type: String, required: true },
+    meta_msg_id: { type: String },
+    type: { type: String },
+    text: { type: String },
+    timestamp: { type: Date },
+    status: { type: String, default: 'sent' },
+    direction: { type: String, enum: ['incoming', 'outgoing'] },
+
+    // new explicit fields:
+    sender_wa_id: { type: String },         // who sent this message (phone)
+    receiver_wa_id: { type: String }        // who received this message (phone)
+  },
+  {
+    timestamps: true,
+    collection: 'processed_messages'
+  }
 );
 
 export default mongoose.model('Message', messageSchema);
