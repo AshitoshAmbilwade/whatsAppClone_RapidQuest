@@ -1,28 +1,32 @@
+// src/hooks/useSocket.js
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-export default function useSocket(wa_id) {
+const SOCKET_URL = import.meta.env.VITE_API_BASE_URL||'http://localhost:5000'; // your backend socket URL
+
+export function useSocket() {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    if (!wa_id) return;
-
-    const socket = io('http://localhost:5000'); // Change to backend URL if deployed
+    const socket = io(SOCKET_URL, { transports: ['websocket'] });
     socketRef.current = socket;
 
-    socket.on('connect', () => {
-      console.log('✅ Connected to Socket.IO:', socket.id);
-      socket.emit('join', wa_id); // join room for this user
+    // Join both Ravi & Neha's personal rooms
+    const defaultUsers = ["919937320320", "918329446654"];
+    defaultUsers.forEach((id) => {
+      socket.emit('join', id);
     });
 
-    socket.on('disconnect', () => {
-      console.log('❌ Disconnected from Socket.IO');
+    // Also join their conversation room (so they get messages instantly)
+    socket.emit('join_conversation', {
+      userWaId: "919937320320",
+      contactWaId: "918329446654"
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [wa_id]);
+  }, []);
 
   return socketRef.current;
 }

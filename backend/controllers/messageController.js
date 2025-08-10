@@ -1,7 +1,8 @@
+// backend/controllers/messageController.js
 import Message from '../models/Message.js';
 import { processPayload } from '../utils/payloadProcessor.js';
 
-// Webhook handler
+// Handle incoming webhook payloads
 export const webhookHandler = async (req, res) => {
   try {
     const payload = req.body;
@@ -13,23 +14,28 @@ export const webhookHandler = async (req, res) => {
   }
 };
 
-// Get conversation messages
+// Fetch all messages for a conversation between the logged-in user & contact
 export const getMessagesByWaId = async (req, res) => {
   try {
     const contactWaId = req.params.wa_id;
     const currentUser = req.query.user;
 
     if (!currentUser) {
-      return res.status(400).json({ success: false, message: 'Missing user query param' });
+      return res.status(400).json({
+        success: false,
+        message: 'Missing user query param: user=<currentUserWaId>'
+      });
     }
 
+    // Only fetch messages between these two participants
     const messages = await Message.find({
       $or: [
         { sender_wa_id: currentUser, receiver_wa_id: contactWaId },
-        { sender_wa_id: contactWaId, receiver_wa_id: currentUser },
-        { wa_id: contactWaId } // legacy fallback
+        { sender_wa_id: contactWaId, receiver_wa_id: currentUser }
       ]
-    }).sort({ timestamp: 1 });
+    })
+      .sort({ timestamp: 1 }) // oldest first for chat display
+      .lean();
 
     res.json({ success: true, messages });
   } catch (error) {
@@ -38,23 +44,26 @@ export const getMessagesByWaId = async (req, res) => {
   }
 };
 
-// Send message
+// Send a message (demo, not WhatsApp API)
 export const sendMessage = async (req, res) => {
   try {
     const { text, sender_wa_id, receiver_wa_id, name } = req.body;
 
-    if (!sender_wa_id || !receiver_wa_id) {
-      return res.status(400).json({ success: false, message: 'sender_wa_id and receiver_wa_id required' });
+    if (!sender_wa_id || !receiver_wa_id || !text?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'sender_wa_id, receiver_wa_id, and text are required'
+      });
     }
 
     const localId = `local-${Date.now()}`;
     const newMsg = await Message.create({
-      wa_id: receiver_wa_id,
+      wa_id: receiver_wa_id, // kept for compatibility
       name: name || null,
       message_id: localId,
       meta_msg_id: localId,
       type: 'text',
-      text,
+      text: text.trim(),
       timestamp: new Date(),
       status: 'sent',
       direction: 'outgoing',
@@ -62,7 +71,7 @@ export const sendMessage = async (req, res) => {
       receiver_wa_id
     });
 
-    // Emit in real-time to the conversation room
+    // Emit to the specific conversation room
     const io = req.app.get('io');
     const roomId = [sender_wa_id, receiver_wa_id].sort().join('-');
     io?.to(roomId).emit('new_message', newMsg);
@@ -73,3 +82,4 @@ export const sendMessage = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+

@@ -5,7 +5,7 @@ import ChatList from '../components/ChatList';
 import ChatWindow from '../components/ChatWindow';
 import { useUser } from '../context/UserContext';
 import { getConversations } from '../api/conversations';
-import useSocket from '../hooks/useSocket';
+import {useSocket} from '../hooks/useSocket';
 
 export default function ChatPage() {
   const params = useParams();

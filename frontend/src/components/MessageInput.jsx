@@ -1,27 +1,29 @@
 import React, { useState } from 'react';
 import { sendMessage } from '../api/messages.js';
-import { useUser } from '../context/UserContext.jsx';
 
-export default function MessageInput({ contactWaId, socket, onMessageSent }) {
+export default function MessageInput({ socket, onMessageSent }) {
   const [text, setText] = useState('');
-  const { user } = useUser();
+
+  // Fixed participants
+  const SENDER_ID = '919937320320';   // Ravi
+  const RECEIVER_ID = '918329446654'; // Neha
 
   const handleSend = async (e) => {
     e.preventDefault();
     const trimmed = text.trim();
-    if (!trimmed || !user?.wa_id) return;
+    if (!trimmed) return;
 
     const newMessage = {
-      wa_id: contactWaId, // legacy contact id
-      name: null,
+      wa_id: RECEIVER_ID, // legacy contact id
+      name: 'Ravi Kumar', // sender name
       message_id: `local-${Date.now()}`,
       type: 'text',
       text: trimmed,
       timestamp: new Date(),
       status: 'sent',
       direction: 'outgoing',
-      sender_wa_id: user.wa_id,
-      receiver_wa_id: contactWaId
+      sender_wa_id: SENDER_ID,
+      receiver_wa_id: RECEIVER_ID
     };
 
     // Optimistic UI update
