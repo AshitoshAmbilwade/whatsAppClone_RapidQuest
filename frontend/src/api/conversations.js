@@ -2,7 +2,7 @@ import axiosInstance from './axiosInstance';
 
 export async function getConversations() {
   try {
-    const res = await axiosInstance.get('/conversations');
+    const res = await axiosInstance.get('/api/conversations');
     return res.data;
   } catch (err) {
     console.error('Error fetching conversations:', err);
