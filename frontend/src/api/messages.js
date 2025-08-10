@@ -21,5 +21,3 @@ export async function sendMessage(messageData) {
     return { success: false };
   }
 }
-
-

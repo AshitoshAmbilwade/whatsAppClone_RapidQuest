@@ -1,20 +1,20 @@
 // backend/routes/messageRoutes.js
 import express from 'express';
 import {
-  webhookHandler,
-  getMessagesByWaId,
-  sendMessage
+    webhookHandler,
+    getMessagesByWaId,
+    sendMessage
 } from '../controllers/messageController.js';
 
 const router = express.Router();
 
-// Webhook for incoming messages
+// Webhook endpoint to process WhatsApp payloads
 router.post('/webhook', webhookHandler);
 
-// Get all messages for a specific wa_id
-router.get('/messages/:wa_id', getMessagesByWaId);
+// Get messages for a specific wa_id
+router.get('/:wa_id', getMessagesByWaId);
 
-// Send a new message
-router.post('/messages', sendMessage);
+// Send a message (demo)
+router.post('/', sendMessage);
 
 export default router;

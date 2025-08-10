@@ -1,42 +1,15 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-export default function ChatList({ conversations, socket, onRefresh }) {
+export default function ChatList({ conversations }) {
   const { wa_id: activeChatId } = useParams();
-
-  // Default refresh: simply re-call onRefresh if provided
-  const handleRefresh = () => {
-    if (typeof onRefresh === 'function') {
-      onRefresh();
-    }
-  };
-
-  // Listen for socket events without disconnecting
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on('new_message', handleRefresh);
-    socket.on('status_updated', handleRefresh);
-
-    return () => {
-      socket.off('new_message', handleRefresh);
-      socket.off('status_updated', handleRefresh);
-    };
-  }, [socket]);
-
-  const formatTimeOrDate = (ts) => {
-    if (!ts) return '';
-    const date = new Date(ts);
-    const now = new Date();
-    return date.toDateString() === now.toDateString()
-      ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : date.toLocaleDateString();
-  };
 
   return (
     <div className="w-1/4 bg-gray-100 border-r overflow-y-auto">
       <div className="p-4 border-b font-bold text-lg">Chats</div>
-      {conversations && conversations.length > 0 ? (
+      {conversations.length === 0 ? (
+        <div className="p-4 text-gray-500">No conversations yet</div>
+      ) : (
         conversations.map((conv) => (
           <Link
             key={conv._id}
@@ -52,12 +25,12 @@ export default function ChatList({ conversations, socket, onRefresh }) {
               </div>
             </div>
             <div className="text-xs text-gray-500">
-              {formatTimeOrDate(conv.last_timestamp)}
+              {conv.last_timestamp
+                ? new Date(conv.last_timestamp).toLocaleTimeString()
+                : ''}
             </div>
           </Link>
         ))
-      ) : (
-        <div className="p-4 text-gray-500">No conversations yet</div>
       )}
     </div>
   );
