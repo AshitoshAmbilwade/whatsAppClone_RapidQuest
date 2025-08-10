@@ -1,73 +1,58 @@
-// server.js (or entrypoint)
+// backend/server.js
+import express from 'express';
 import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import dotenv from 'dotenv';
-import { Server } from 'socket.io';
-import app from './src/app.js';
-import connectDB from './src/config/db.js';
+import cors from 'cors';
+import connectDB from './config/db.js';
+
+// Routes
+import messageRoutes from './routes/messageRoutes.js';
+import conversationRoutes from './routes/conversationRoutes.js';
+
+// Socket events
+import chatSocket from './sockets/chatSocket.js';
 
 dotenv.config();
+
+// Connect to MongoDB
 connectDB();
 
+const app = express();
 const server = http.createServer(app);
 
-const io = new Server(server, {
-  cors: {
-    origin: process.env.CLIENT_URL || '*',
-    methods: ['GET','POST']
-  }
+// Socket.IO instance
+const io = new SocketIOServer(server, {
+    cors: {
+        origin: '*', // Change to your frontend URL in production
+        methods: ['GET', 'POST']
+    }
 });
 
+// Make io accessible in controllers
 app.set('io', io);
 
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// API Routes
+app.use('/api/messages', messageRoutes);
+app.use('/api/conversations', conversationRoutes);
+
+// Socket.IO setup
 io.on('connection', (socket) => {
-  console.log('🔌 New socket connected', socket.id);
+    console.log(`🔌 New client connected: ${socket.id}`);
 
-  // Register user (optional) - easy for simulation/testing
-  socket.on('register_user', (waId) => {
-    if (!waId) return;
-    socket.join(`user_${waId}`);
-    console.log(`Socket ${socket.id} registered as user_${waId}`);
-  });
+    // Attach chat-specific socket events
+    chatSocket(io, socket);
 
-  socket.on('join_conversation', (waId) => {
-    if (!waId) return;
-    socket.join(`conversation_${waId}`);
-    console.log(`Socket ${socket.id} joined conversation_${waId}`);
-  });
-
-  socket.on('leave_conversation', (waId) => {
-    if (!waId) return;
-    socket.leave(`conversation_${waId}`);
-    console.log(`Socket ${socket.id} left conversation_${waId}`);
-  });
-
-  // Client wants to send a message via socket
-  socket.on('send_message', async (payload, ackCb) => {
-    try {
-      // Use your service to create and persist the message
-      // import createMessageService from service at top-level or require here
-      const { createMessageService } = await import('./src/services/messageService.js');
-      const saved = await createMessageService(payload);
-
-      // Emit to the conversation room (so viewers see it)
-      const room = `conversation_${saved.wa_id}`;
-      io.to(room).emit('new_message', saved);
-
-      // Also emit a conversation-list update to all (or specific admin)
-      io.emit('conversation_updated', { wa_id: saved.wa_id, last_message: saved.text, last_timestamp: saved.timestamp });
-
-      // Ack back to sender with saved doc (optional)
-      if (typeof ackCb === 'function') ackCb({ success: true, message: saved });
-    } catch (err) {
-      console.error('Error handling send_message', err);
-      if (typeof ackCb === 'function') ackCb({ success: false, error: err.message });
-    }
-  });
-
-  socket.on('disconnect', () => {
-    console.log('❌ Socket disconnected', socket.id);
-  });
+    socket.on('disconnect', () => {
+        console.log(`❌ Client disconnected: ${socket.id}`);
+    });
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+});
