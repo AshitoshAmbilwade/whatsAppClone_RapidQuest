@@ -91,6 +91,7 @@ export const searchMessages = async (req, res, next) => {
 };
 
 // PATCH /api/messages/:wa_id/read
+// PATCH /api/messages/:wa_id/read
 export const markMessagesAsRead = async (req, res, next) => {
   try {
     const { wa_id } = req.params;
@@ -99,7 +100,15 @@ export const markMessagesAsRead = async (req, res, next) => {
     const result = await markMessagesAsReadService(wa_id);
 
     if (io) {
-      io.emit('messages_read', { wa_id });
+      // ✅ Emit to only the relevant rooms instead of global
+      io.to(`conversation_${wa_id}`).emit('message_status_update', {
+        message_id: null, // or loop through the updated messages
+        status: 'read'
+      });
+      io.to(`user_${wa_id}`).emit('message_status_update', {
+        message_id: null,
+        status: 'read'
+      });
     }
 
     res.status(200).json({
@@ -111,15 +120,23 @@ export const markMessagesAsRead = async (req, res, next) => {
   }
 };
 
+
 // POST /api/messages
+// in controllers/messageController.js (createMessage)
 export const createMessage = async (req, res, next) => {
   try {
-    const io = req.app.get('io'); // ✅ get Socket.IO instance
+    const io = req.app.get('io');
     const newMessage = await createMessageService(req.body);
 
-    // Emit real-time update to all connected clients
+    // Emit to the conversation room only
     if (io) {
-      io.emit('new_message', newMessage);
+      io.to(`conversation_${newMessage.wa_id}`).emit('new_message', newMessage);
+      // also notify conversation list change (everyone)
+      io.emit('conversation_updated', {
+        wa_id: newMessage.wa_id,
+        last_message: newMessage.text,
+        last_timestamp: newMessage.timestamp
+      });
     }
 
     res.status(201).json({ success: true, message: newMessage });
