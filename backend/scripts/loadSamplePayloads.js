@@ -5,7 +5,7 @@ import axios from 'axios';
 
 // CONFIG — change if needed
 const PAYLOADS_DIR = path.join(process.cwd(), 'data', 'sample_payloads');
-const API_URL = 'http://localhost:5000/api/messages/webhook'; // Your backend URL
+const API_URL = 'https://whatsappclone-rapidquest.onrender.com/api/messages/webhook'; // Your backend URL
 
 async function sendPayload(filePath) {
     try {
