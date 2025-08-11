@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function MessageBubble({ message, isOwn }) {
+export default function MessageBubble({ message }) {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'sent':
@@ -28,11 +28,14 @@ export default function MessageBubble({ message, isOwn }) {
     }
   };
 
+  // Align based on message.direction
+  const isIncoming = message.direction === 'outgoing';
+
   return (
-    <div className={`flex mb-2 px-2 md:px-4 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex mb-2 px-2 md:px-4 ${isIncoming ? 'justify-end' : 'justify-start'}`}>
       <div
         className={`relative max-w-[80%] sm:max-w-sm md:max-w-md px-4 py-3 rounded-2xl shadow 
-        ${isOwn 
+        ${isIncoming 
           ? 'bg-[#DCF8C6] rounded-br-none' 
           : 'bg-white rounded-bl-none'
         }`}
@@ -43,18 +46,18 @@ export default function MessageBubble({ message, isOwn }) {
         )}
 
         {/* Time + status */}
-        <div className={`flex justify-end items-center space-x-1 mt-1 text-[11px] ${isOwn ? 'text-gray-600' : 'text-gray-500'}`}>
+        <div className={`flex justify-end items-center space-x-1 mt-1 text-[11px] ${isIncoming ? 'text-gray-600' : 'text-gray-500'}`}>
           <span>
             {new Date(message.timestamp).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
             })}
           </span>
-          {isOwn && <span className="ml-1">{getStatusIcon(message.status)}</span>}
+          {isIncoming && <span className="ml-1">{getStatusIcon(message.status)}</span>}
         </div>
 
         {/* Tail for message bubble */}
-        {isOwn ? (
+        {isIncoming ? (
           <div className="absolute -right-1.5 bottom-0 w-3 h-3 overflow-hidden">
             <div className="absolute w-3 h-3 bg-[#DCF8C6] -rotate-45 transform origin-bottom-right"></div>
           </div>
