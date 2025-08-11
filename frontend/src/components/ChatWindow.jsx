@@ -2,57 +2,70 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMessagesByWaId } from '../api/messages.js';
-import { useUser } from '../context/UserContext.jsx';
+import { getConversations } from '../api/conversations.js';
 import MessageBubble from './MessageBubble.jsx';
 import MessageInput from './MessageInput.jsx';
 import Header from './Header.jsx';
 
-export default function ChatWindow({ contactWaId, socket }) {
+export default function ChatWindow({ contactWaId, socket, currentUser }) {
   const navigate = useNavigate();
-  const { user } = useUser();
   const [messages, setMessages] = useState([]);
+  const [contactName, setContactName] = useState(contactWaId);
   const messagesEndRef = useRef(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  
-  // Check if mobile view
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
 
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Function to handle back button (for mobile view)
-  const goBack = () => {
-    navigate('/chats');
-  };
+  const goBack = () => navigate('/chats');
 
-  // Fetch messages when chat changes
+  // 🔹 Fetch contact name from conversations list
   useEffect(() => {
-    if (!contactWaId || !user) return;
+  if (!contactWaId) return;
 
-    getMessagesByWaId(contactWaId, user.wa_id).then((data) => {
+  getConversations().then((data) => {
+    if (data.success && Array.isArray(data.conversations)) {
+      // ✅ Match conversation by wa_id
+      const convo = data.conversations.find(
+        (c) => c.wa_id === contactWaId
+      );
+
+      // ✅ Prefer name if available, else fallback to WA ID
+      setContactName(convo?.name || contactWaId);
+    } else {
+      setContactName(contactWaId);
+    }
+  }).catch(() => {
+    setContactName(contactWaId);
+  });
+}, [contactWaId]);
+
+  // Fetch messages for the conversation
+  useEffect(() => {
+    if (!contactWaId || !currentUser?.wa_id) return;
+    getMessagesByWaId(contactWaId, currentUser.wa_id).then((data) => {
       if (data.success) {
         setMessages(data.messages);
       }
     });
-  }, [contactWaId, user]);
+  }, [contactWaId, currentUser?.wa_id]);
 
-  // Scroll to bottom when messages change
+  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Real-time message handling
+  // Handle incoming socket events
   useEffect(() => {
-    if (!socket || !user) return;
+    if (!socket || !currentUser) return;
 
     const handleIncoming = (msg) => {
       const isRelevant =
-        (msg.sender_wa_id === contactWaId && msg.receiver_wa_id === user.wa_id) ||
-        (msg.sender_wa_id === user.wa_id && msg.receiver_wa_id === contactWaId);
+        (msg.sender_wa_id === contactWaId && msg.receiver_wa_id === currentUser.wa_id) ||
+        (msg.sender_wa_id === currentUser.wa_id && msg.receiver_wa_id === contactWaId);
 
       if (isRelevant) {
         setMessages((prev) => [...prev, msg]);
@@ -77,39 +90,42 @@ export default function ChatWindow({ contactWaId, socket }) {
       socket.off('message_sent', handleIncoming);
       socket.off('status_updated');
     };
-  }, [socket, contactWaId, user]);
+  }, [socket, contactWaId, currentUser]);
 
   return (
     <div className="flex flex-col w-full h-full">
-      {/* Header with back button for mobile */}
-      <Header 
-        contactName={messages[0]?.name || contactWaId}
+      <Header
+        contactName={currentUser.name}
         contactNumber={contactWaId}
         onBack={isMobile ? goBack : null}
       />
 
-      {/* Messages area */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-2 md:p-4 bg-gray-50">
         <div className="max-w-4xl mx-auto w-full">
           {messages.map((msg) => (
             <MessageBubble
               key={msg.message_id}
               message={msg}
-              isOwn={msg.sender_wa_id === user?.wa_id}
+              isOwn={msg.sender_wa_id === currentUser.wa_id}
             />
           ))}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Input area */}
+      {/* Input */}
       <div className="pb-2 md:pb-4 bg-white">
         <div className="max-w-4xl mx-auto w-full px-2 md:px-0">
           <MessageInput
             contactWaId={contactWaId}
             socket={socket}
+            currentUser={currentUser}
             onMessageSent={(msg) =>
-              setMessages((prev) => [...prev, { ...msg, sender_wa_id: user.wa_id }])
+              setMessages((prev) => [
+                ...prev,
+                { ...msg, sender_wa_id: currentUser.wa_id }
+              ])
             }
           />
         </div>
