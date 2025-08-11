@@ -1,5 +1,5 @@
 // backend/utils/payloadProcessor.js
-import Message from '../models/Message.js';
+import Message from '../models/Message.js'; // Use your actual schema
 
 export const processPayload = async (payload) => {
   try {
@@ -9,14 +9,14 @@ export const processPayload = async (payload) => {
     for (const change of changes) {
       const value = change.value;
 
-      // Message payloads
+      // 📩 Message payloads
       if (change.field === 'messages' && value?.messages) {
         const contact = value.contacts?.[0] || {};
         const msg = value.messages?.[0] || {};
         const contactWaId = contact.wa_id || null;
         const name = contact.profile?.name || null;
 
-        // business number from payload metadata
+        // Business number from payload metadata
         const businessNumber =
           value.metadata?.display_phone_number ||
           value.metadata?.phone_number_id ||
@@ -24,11 +24,17 @@ export const processPayload = async (payload) => {
 
         const sender = msg.from;
         const receiver = businessNumber; // webhook receiver is business number
-
         const direction = sender === businessNumber ? 'outgoing' : 'incoming';
 
+        // 🚫 Duplicate check
+        const existing = await ProceedMessage.findOne({ message_id: msg.id });
+        if (existing) {
+          console.log(`⚠️ Duplicate skipped: ${msg.id}`);
+          continue;
+        }
+
         const newMessage = {
-          wa_id: contactWaId,                 // contact id (legacy)
+          wa_id: contactWaId,
           name,
           message_id: msg.id,
           meta_msg_id: msg.id,
@@ -45,10 +51,10 @@ export const processPayload = async (payload) => {
         console.log(`💾 Message stored: ${msg.id}`);
       }
 
-      // Status payloads
+      // 📌 Status payloads
       if (change.field === 'statuses' && value?.id) {
         const { id, status } = value;
-        const updatedMsg = await Message.findOneAndUpdate(
+        const updatedMsg = await ProceedMessage.findOneAndUpdate(
           {
             $or: [{ message_id: id }, { meta_msg_id: id }]
           },
